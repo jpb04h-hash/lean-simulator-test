@@ -50,7 +50,7 @@
         transition: background-color 0.25s ease, box-shadow 0.25s ease;
     }
 
-    /* ⭐ WIP SIGNAL (Lean Mechanic #1) */
+    /* WIP SIGNAL */
     .column.wip-warning {
         background-color: #fff7d6;
         box-shadow: 0 0 0 3px #ffcc4d inset;
@@ -78,8 +78,17 @@
         cursor: grab;
         user-select: none;
         box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        transition: transform 0.15s ease, box-shadow 0.18s ease;
+        transition: transform 0.15s ease, box-shadow 0.18s ease, opacity 0.18s ease;
         position: relative;
+        opacity: 1;
+    }
+
+    .note.newly-added {
+        opacity: 0;
+    }
+
+    .note.appeared {
+        opacity: 1;
     }
 
     .note:hover {
@@ -95,7 +104,6 @@
         z-index: 999;
     }
 
-    /* ⭐ Lift Shadow */
     .note.lifted {
         box-shadow: 10px 12px 18px rgba(0,0,0,0.28);
     }
@@ -105,7 +113,6 @@
         to   { transform: scale(1.08) rotate(-1deg); }
     }
 
-    /* ⭐ Soft Drop Animation */
     @keyframes softDrop {
         0%   { transform: scale(1.05) rotate(0.5deg); }
         60%  { transform: scale(0.97) rotate(0deg); }
@@ -117,9 +124,9 @@
     }
 
     .yellow { background: #FFEB3B; }
-    .blue { background: #81D4FA; }
-    .pink { background: #F48FB1; }
-    .green { background: #A5D6A7; }
+    .blue   { background: #81D4FA; }
+    .pink   { background: #F48FB1; }
+    .green  { background: #A5D6A7; }
 </style>
 
 </head>
@@ -128,37 +135,43 @@
 <div class="header"></div>
 
 <div class="container">
-    <div class="column">
+    <div class="column" id="col-1">
         <h2>COLUMN 1</h2>
         <div class="note yellow" draggable="true">Note A</div>
         <div class="note blue" draggable="true">Note B</div>
     </div>
 
-    <div class="column">
+    <div class="column" id="col-2">
         <h2>COLUMN 2</h2>
         <div class="note pink" draggable="true">Note C</div>
         <div class="note green" draggable="true">Note D</div>
     </div>
 
-    <div class="column">
+    <div class="column" id="col-3">
         <h2>COLUMN 3</h2>
     </div>
 </div>
 
 <script>
+    const columns = document.querySelectorAll('.column');
+    const intakeColumn = document.getElementById('col-1');
+    let noteCounter = 5;
+
     // Random rotation for realism
-    document.querySelectorAll('.note').forEach(note => {
+    function randomizeRotation(note) {
         const angle = (Math.random() * 4 - 2);
         note.style.transform = `rotate(${angle}deg)`;
+    }
+
+    document.querySelectorAll('.note').forEach(note => {
+        randomizeRotation(note);
     });
 
-    const notes = document.querySelectorAll('.note');
-    const columns = document.querySelectorAll('.column');
+    // Attach drag + touch behavior to a note
+    function attachNoteBehavior(note) {
+        note.setAttribute('draggable', 'true');
 
-    // -----------------------------
-    // DESKTOP DRAG SUPPORT
-    // -----------------------------
-    notes.forEach(note => {
+        // Desktop drag
         note.addEventListener('dragstart', () => {
             note.classList.add('dragging');
             note.classList.add('lifted');
@@ -174,41 +187,8 @@
                 updateWIPSignals();
             }, 160);
         });
-    });
 
-    columns.forEach(column => {
-        column.addEventListener('dragover', e => {
-            e.preventDefault();
-            const dragging = document.querySelector('.dragging');
-            const afterElement = getDragAfterElement(column, e.clientY);
-            if (!afterElement) {
-                column.appendChild(dragging);
-            } else {
-                column.insertBefore(dragging, afterElement);
-            }
-        });
-    });
-
-    function getDragAfterElement(column, y) {
-        const draggableElements = [...column.querySelectorAll('.note:not(.dragging)')];
-
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
-    // -----------------------------
-    // TOUCH SUPPORT (iPhone/iPad)
-    // -----------------------------
-    let activeNote = null;
-
-    notes.forEach(note => {
+        // Touch drag
         note.addEventListener('touchstart', e => {
             activeNote = note;
             note.classList.add('dragging');
@@ -257,7 +237,42 @@
 
             activeNote = null;
         });
+    }
+
+    // Initial notes behavior
+    document.querySelectorAll('.note').forEach(attachNoteBehavior);
+
+    // Desktop drag over columns
+    columns.forEach(column => {
+        column.addEventListener('dragover', e => {
+            e.preventDefault();
+            const dragging = document.querySelector('.dragging');
+            if (!dragging) return;
+            const afterElement = getDragAfterElement(column, e.clientY);
+            if (!afterElement) {
+                column.appendChild(dragging);
+            } else {
+                column.insertBefore(dragging, afterElement);
+            }
+        });
     });
+
+    function getDragAfterElement(column, y) {
+        const draggableElements = [...column.querySelectorAll('.note:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Touch helpers
+    let activeNote = null;
 
     function getColumnUnderTouch(x, y) {
         return [...columns].find(col => {
@@ -266,9 +281,7 @@
         });
     }
 
-    // -----------------------------
-    // ⭐ LEAN MECHANIC #1 — WIP SIGNAL
-    // -----------------------------
+    // WIP awareness
     function updateWIPSignals() {
         columns.forEach(column => {
             const count = column.querySelectorAll('.note').length;
@@ -281,6 +294,31 @@
     }
 
     updateWIPSignals();
+
+    // Automatic intake feed (every 10 seconds)
+    const colors = ['yellow', 'blue', 'pink', 'green'];
+
+    function createIncomingNote() {
+        const note = document.createElement('div');
+        const colorClass = colors[Math.floor(Math.random() * colors.length)];
+        note.className = `note ${colorClass} newly-added`;
+        note.textContent = `Work ${noteCounter++}`;
+
+        intakeColumn.appendChild(note);
+
+        randomizeRotation(note);
+        attachNoteBehavior(note);
+
+        // fade in
+        requestAnimationFrame(() => {
+            note.classList.add('appeared');
+            note.classList.remove('newly-added');
+        });
+
+        updateWIPSignals();
+    }
+
+    setInterval(createIncomingNote, 10000);
 </script>
 
 </body>
