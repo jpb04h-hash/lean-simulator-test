@@ -5,14 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bussell Lean Simulator</title>
 
-<!-- Modern, clean typography -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
     body {
         margin: 0;
         font-family: 'Inter', sans-serif;
-        background: #e9e6df; /* warm workshop-table tone */
+        background: #e9e6df;
         background-image: linear-gradient(
             rgba(255,255,255,0.15) 1px,
             transparent 1px
@@ -22,19 +21,16 @@
             rgba(255,255,255,0.15) 1px,
             transparent 1px
         );
-        background-size: 40px 40px; /* subtle grid texture */
+        background-size: 40px 40px;
     }
 
-    /* Bussell Lean Blue Header */
     .header {
         width: 100%;
         background-color: #1E4F9A;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        position: relative;
     }
 
-    /* Page layout */
     .container {
         display: flex;
         justify-content: space-around;
@@ -50,6 +46,7 @@
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         min-height: 400px;
+        position: relative;
     }
 
     .column h2 {
@@ -58,7 +55,6 @@
         margin-bottom: 15px;
     }
 
-    /* Sticky notes */
     .note {
         width: 120px;
         padding: 12px;
@@ -71,20 +67,20 @@
         user-select: none;
         box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         transition: transform 0.15s ease, box-shadow 0.15s ease;
+        position: relative;
     }
 
-    /* Hover glow */
     .note:hover {
         box-shadow: 3px 3px 6px rgba(0,0,0,0.25);
     }
 
-    /* Lift + wobble while dragging */
     .dragging {
         opacity: 0.9;
         cursor: grabbing;
         transform: scale(1.08) rotate(1deg);
         box-shadow: 6px 6px 12px rgba(0,0,0,0.3);
         animation: wobble 0.25s infinite ease-in-out alternate;
+        z-index: 999;
     }
 
     @keyframes wobble {
@@ -101,10 +97,8 @@
 </head>
 <body>
 
-<!-- Clean Bussell Lean Blue Header (no logo) -->
 <div class="header"></div>
 
-<!-- Main Simulator Layout -->
 <div class="container">
     <div class="column">
         <h2>COLUMN 1</h2>
@@ -124,16 +118,18 @@
 </div>
 
 <script>
-    // Add slight random rotation to each note
+    // Random rotation for realism
     document.querySelectorAll('.note').forEach(note => {
-        const angle = (Math.random() * 4 - 2); // -2 to +2 degrees
+        const angle = (Math.random() * 4 - 2);
         note.style.transform = `rotate(${angle}deg)`;
     });
 
-    // Drag-and-drop logic
     const notes = document.querySelectorAll('.note');
     const columns = document.querySelectorAll('.column');
 
+    // -----------------------------
+    // DESKTOP DRAG SUPPORT
+    // -----------------------------
     notes.forEach(note => {
         note.addEventListener('dragstart', () => {
             note.classList.add('dragging');
@@ -169,6 +165,61 @@
                 return closest;
             }
         }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // -----------------------------
+    // TOUCH SUPPORT (iPhone/iPad)
+    // -----------------------------
+    let activeNote = null;
+
+    notes.forEach(note => {
+        note.addEventListener('touchstart', e => {
+            activeNote = note;
+            note.classList.add('dragging');
+
+            const touch = e.touches[0];
+            const rect = note.getBoundingClientRect();
+
+            note.offsetX = touch.clientX - rect.left;
+            note.offsetY = touch.clientY - rect.top;
+
+            note.style.position = "absolute";
+            note.style.zIndex = 999;
+        });
+
+        note.addEventListener('touchmove', e => {
+            if (!activeNote) return;
+
+            const touch = e.touches[0];
+            activeNote.style.left = (touch.clientX - activeNote.offsetX) + "px";
+            activeNote.style.top = (touch.clientY - activeNote.offsetY) + "px";
+
+            const column = getColumnUnderTouch(touch.clientX, touch.clientY);
+            activeNote.currentColumn = column;
+        });
+
+        note.addEventListener('touchend', () => {
+            if (!activeNote) return;
+
+            activeNote.classList.remove('dragging');
+
+            if (activeNote.currentColumn) {
+                activeNote.currentColumn.appendChild(activeNote);
+            }
+
+            activeNote.style.position = "relative";
+            activeNote.style.left = "auto";
+            activeNote.style.top = "auto";
+
+            activeNote = null;
+        });
+    });
+
+    function getColumnUnderTouch(x, y) {
+        return [...columns].find(col => {
+            const rect = col.getBoundingClientRect();
+            return x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
+        });
     }
 </script>
 
