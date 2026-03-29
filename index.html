@@ -47,7 +47,8 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         min-height: 400px;
         position: relative;
-        transition: background-color 0.25s ease, box-shadow 0.25s ease;
+        transition: background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        border: 2px solid transparent;
     }
 
     /* WIP SIGNAL */
@@ -67,6 +68,16 @@
         color: #b88600;
     }
 
+    /* Bottleneck highlight */
+    .column.bottleneck {
+        border-color: #e53935;
+        box-shadow: 0 0 0 3px rgba(229,57,53,0.4);
+    }
+
+    .column.bottleneck h2 {
+        color: #c62828;
+    }
+
     .note {
         width: 120px;
         padding: 12px;
@@ -78,10 +89,12 @@
         cursor: grab;
         user-select: none;
         box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        transition: transform 0.15s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+        transition: transform 0.15s ease, box-shadow 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
         position: relative;
         opacity: 1;
         background-clip: padding-box;
+        border: 2px solid transparent;
+        font-size: 0.9rem;
     }
 
     .note.newly-added {
@@ -122,6 +135,21 @@
         cursor: not-allowed;
     }
 
+    /* Aging states */
+    .note.age-warn {
+        border-color: #b0bec5;
+    }
+
+    .note.age-stale {
+        border-color: #546e7a;
+        color: #263238;
+    }
+
+    .note.age-critical {
+        border-color: #e53935;
+        box-shadow: 0 0 8px rgba(229,57,53,0.6);
+    }
+
     @keyframes wobble {
         from { transform: scale(1.08) rotate(1deg); }
         to   { transform: scale(1.08) rotate(-1deg); }
@@ -150,19 +178,23 @@
 
 <div class="container">
     <div class="column" id="col-1">
-        <h2>COLUMN 1</h2>
-        <div class="note yellow" draggable="true">Note A</div>
-        <div class="note blue" draggable="true">Note B</div>
+        <h2>INTAKE</h2>
+        <div class="note yellow" draggable="true">Request A</div>
+        <div class="note blue" draggable="true">Request B</div>
     </div>
 
     <div class="column" id="col-2">
-        <h2>COLUMN 2</h2>
-        <div class="note pink" draggable="true">Note C</div>
-        <div class="note green" draggable="true">Note D</div>
+        <h2>TRIAGE</h2>
+        <div class="note pink" draggable="true">Request C</div>
+        <div class="note green" draggable="true">Request D</div>
     </div>
 
     <div class="column" id="col-3">
-        <h2>COLUMN 3</h2>
+        <h2>PROCESSING</h2>
+    </div>
+
+    <div class="column" id="col-4">
+        <h2>COMPLETE</h2>
     </div>
 </div>
 
@@ -174,9 +206,10 @@
 
     // WIP limits per column
     const WIP_LIMITS = {
-        'col-1': 4,   // Intake
-        'col-2': 3,   // Doing
-        'col-3': Infinity // Done
+        'col-1': 4,        // Intake
+        'col-2': 3,        // Triage
+        'col-3': 3,        // Processing
+        'col-4': Infinity  // Complete
     };
 
     function getColumnCount(column) {
@@ -207,12 +240,38 @@
         });
     }
 
+    // Aging: assign createdAt and update classes based on age
+    function markCreated(note) {
+        note.dataset.createdAt = Date.now().toString();
+    }
+
+    function updateAging() {
+        const now = Date.now();
+        document.querySelectorAll('.note').forEach(note => {
+            const created = parseInt(note.dataset.createdAt || now, 10);
+            const ageSec = (now - created) / 1000;
+
+            note.classList.remove('age-warn', 'age-stale', 'age-critical');
+
+            if (ageSec > 30) {
+                note.classList.add('age-critical');
+            } else if (ageSec > 20) {
+                note.classList.add('age-stale');
+            } else if (ageSec > 10) {
+                note.classList.add('age-warn');
+            }
+        });
+    }
+
+    setInterval(updateAging, 1000);
+
     // Attach drag + touch behavior to a note
     function attachNoteBehavior(note) {
         note.setAttribute('draggable', 'true');
         note.originalColumn = note.parentElement;
 
         attachBlockerToggle(note);
+        markCreated(note);
 
         // Desktop drag
         note.addEventListener('dragstart', () => {
@@ -231,7 +290,6 @@
 
             const currentColumn = note.parentElement;
             if (!canAddToColumn(currentColumn)) {
-                // revert to original column if over limit
                 note.originalColumn.appendChild(note);
             }
 
@@ -281,7 +339,6 @@
             if (activeNote.currentColumn && canAddToColumn(activeNote.currentColumn)) {
                 activeNote.currentColumn.appendChild(activeNote);
             } else {
-                // revert if no column or over limit
                 activeNote.originalColumn.appendChild(activeNote);
             }
 
@@ -353,6 +410,37 @@
 
     updateWIPSignals();
 
+    // Bottleneck detection
+    function updateBottleneck() {
+        let worstColumn = null;
+        let worstScore = -1;
+
+        columns.forEach(column => {
+            const notes = column.querySelectorAll('.note');
+            let score = 0;
+
+            notes.forEach(note => {
+                score += 1; // base
+                if (note.classList.contains('blocked')) score += 2;
+                if (note.classList.contains('age-warn')) score += 1;
+                if (note.classList.contains('age-stale')) score += 2;
+                if (note.classList.contains('age-critical')) score += 3;
+            });
+
+            if (score > worstScore) {
+                worstScore = score;
+                worstColumn = column;
+            }
+        });
+
+        columns.forEach(column => column.classList.remove('bottleneck'));
+        if (worstColumn && worstScore > 0) {
+            worstColumn.classList.add('bottleneck');
+        }
+    }
+
+    setInterval(updateBottleneck, 2000);
+
     // Automatic intake feed (every 10 seconds)
     const colors = ['yellow', 'blue', 'pink', 'green'];
 
@@ -365,7 +453,7 @@
         const note = document.createElement('div');
         const colorClass = colors[Math.floor(Math.random() * colors.length)];
         note.className = `note ${colorClass} newly-added`;
-        note.textContent = `Work ${noteCounter++}`;
+        note.textContent = `Request ${noteCounter++}`;
 
         intakeColumn.appendChild(note);
 
