@@ -81,6 +81,7 @@
         transition: transform 0.15s ease, box-shadow 0.18s ease, opacity 0.18s ease;
         position: relative;
         opacity: 1;
+        background-clip: padding-box;
     }
 
     .note.newly-added {
@@ -106,6 +107,19 @@
 
     .note.lifted {
         box-shadow: 10px 12px 18px rgba(0,0,0,0.28);
+    }
+
+    /* Blocked notes */
+    .note.blocked {
+        background: repeating-linear-gradient(
+            -45deg,
+            #e57373,
+            #e57373 6px,
+            #ef9a9a 6px,
+            #ef9a9a 12px
+        );
+        color: #ffffff;
+        cursor: not-allowed;
     }
 
     @keyframes wobble {
@@ -156,6 +170,24 @@
     const columns = document.querySelectorAll('.column');
     const intakeColumn = document.getElementById('col-1');
     let noteCounter = 5;
+    let activeNote = null;
+
+    // WIP limits per column
+    const WIP_LIMITS = {
+        'col-1': 4,   // Intake
+        'col-2': 3,   // Doing
+        'col-3': Infinity // Done
+    };
+
+    function getColumnCount(column) {
+        return column.querySelectorAll('.note').length;
+    }
+
+    function canAddToColumn(column) {
+        const id = column.id;
+        const limit = WIP_LIMITS[id] ?? Infinity;
+        return getColumnCount(column) < limit;
+    }
 
     // Random rotation for realism
     function randomizeRotation(note) {
@@ -167,20 +199,41 @@
         randomizeRotation(note);
     });
 
+    // Toggle blocked state (double-click / double-tap)
+    function attachBlockerToggle(note) {
+        note.addEventListener('dblclick', () => {
+            note.classList.toggle('blocked');
+            updateWIPSignals();
+        });
+    }
+
     // Attach drag + touch behavior to a note
     function attachNoteBehavior(note) {
         note.setAttribute('draggable', 'true');
+        note.originalColumn = note.parentElement;
+
+        attachBlockerToggle(note);
 
         // Desktop drag
         note.addEventListener('dragstart', () => {
+            if (note.classList.contains('blocked')) return;
+            note.originalColumn = note.parentElement;
             note.classList.add('dragging');
             note.classList.add('lifted');
         });
 
         note.addEventListener('dragend', () => {
+            if (!note.classList.contains('dragging')) return;
+
             note.classList.remove('dragging');
             note.classList.remove('lifted');
             note.classList.add('dropping');
+
+            const currentColumn = note.parentElement;
+            if (!canAddToColumn(currentColumn)) {
+                // revert to original column if over limit
+                note.originalColumn.appendChild(note);
+            }
 
             setTimeout(() => {
                 note.classList.remove('dropping');
@@ -190,7 +243,10 @@
 
         // Touch drag
         note.addEventListener('touchstart', e => {
+            if (note.classList.contains('blocked')) return;
+
             activeNote = note;
+            note.originalColumn = note.parentElement;
             note.classList.add('dragging');
             note.classList.add('lifted');
 
@@ -222,8 +278,11 @@
             activeNote.classList.remove('lifted');
             activeNote.classList.add('dropping');
 
-            if (activeNote.currentColumn) {
+            if (activeNote.currentColumn && canAddToColumn(activeNote.currentColumn)) {
                 activeNote.currentColumn.appendChild(activeNote);
+            } else {
+                // revert if no column or over limit
+                activeNote.originalColumn.appendChild(activeNote);
             }
 
             setTimeout(() => {
@@ -248,6 +307,7 @@
             e.preventDefault();
             const dragging = document.querySelector('.dragging');
             if (!dragging) return;
+
             const afterElement = getDragAfterElement(column, e.clientY);
             if (!afterElement) {
                 column.appendChild(dragging);
@@ -272,8 +332,6 @@
     }
 
     // Touch helpers
-    let activeNote = null;
-
     function getColumnUnderTouch(x, y) {
         return [...columns].find(col => {
             const rect = col.getBoundingClientRect();
@@ -299,6 +357,11 @@
     const colors = ['yellow', 'blue', 'pink', 'green'];
 
     function createIncomingNote() {
+        if (!canAddToColumn(intakeColumn)) {
+            // Intake at limit: no new work enters
+            return;
+        }
+
         const note = document.createElement('div');
         const colorClass = colors[Math.floor(Math.random() * colors.length)];
         note.className = `note ${colorClass} newly-added`;
