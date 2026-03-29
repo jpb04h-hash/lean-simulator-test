@@ -66,7 +66,7 @@
         cursor: grab;
         user-select: none;
         box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        transition: transform 0.15s ease, box-shadow 0.18s ease;
         position: relative;
     }
 
@@ -81,6 +81,11 @@
         box-shadow: 6px 6px 12px rgba(0,0,0,0.3);
         animation: wobble 0.25s infinite ease-in-out alternate;
         z-index: 999;
+    }
+
+    /* ⭐ NEW: Lift Shadow */
+    .note.lifted {
+        box-shadow: 10px 12px 18px rgba(0,0,0,0.28);
     }
 
     @keyframes wobble {
@@ -133,10 +138,12 @@
     notes.forEach(note => {
         note.addEventListener('dragstart', () => {
             note.classList.add('dragging');
+            note.classList.add('lifted'); // ⭐ NEW
         });
 
         note.addEventListener('dragend', () => {
             note.classList.remove('dragging');
+            note.classList.remove('lifted'); // ⭐ NEW
         });
     });
 
@@ -176,6 +183,7 @@
         note.addEventListener('touchstart', e => {
             activeNote = note;
             note.classList.add('dragging');
+            note.classList.add('lifted'); // ⭐ NEW
 
             const touch = e.touches[0];
             const rect = note.getBoundingClientRect();
@@ -202,6 +210,7 @@
             if (!activeNote) return;
 
             activeNote.classList.remove('dragging');
+            activeNote.classList.remove('lifted'); // ⭐ NEW
 
             if (activeNote.currentColumn) {
                 activeNote.currentColumn.appendChild(activeNote);
