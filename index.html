@@ -47,12 +47,24 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         min-height: 400px;
         position: relative;
+        transition: background-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    /* ⭐ WIP SIGNAL (Lean Mechanic #1) */
+    .column.wip-warning {
+        background-color: #fff7d6;
+        box-shadow: 0 0 0 3px #ffcc4d inset;
     }
 
     .column h2 {
         text-align: center;
         font-weight: 600;
         margin-bottom: 15px;
+        transition: color 0.25s ease;
+    }
+
+    .column.wip-warning h2 {
+        color: #b88600;
     }
 
     .note {
@@ -83,7 +95,7 @@
         z-index: 999;
     }
 
-    /* ⭐ NEW: Lift Shadow */
+    /* ⭐ Lift Shadow */
     .note.lifted {
         box-shadow: 10px 12px 18px rgba(0,0,0,0.28);
     }
@@ -91,6 +103,17 @@
     @keyframes wobble {
         from { transform: scale(1.08) rotate(1deg); }
         to   { transform: scale(1.08) rotate(-1deg); }
+    }
+
+    /* ⭐ Soft Drop Animation */
+    @keyframes softDrop {
+        0%   { transform: scale(1.05) rotate(0.5deg); }
+        60%  { transform: scale(0.97) rotate(0deg); }
+        100% { transform: scale(1.00) rotate(0deg); }
+    }
+
+    .note.dropping {
+        animation: softDrop 0.14s ease-out;
     }
 
     .yellow { background: #FFEB3B; }
@@ -138,12 +161,18 @@
     notes.forEach(note => {
         note.addEventListener('dragstart', () => {
             note.classList.add('dragging');
-            note.classList.add('lifted'); // ⭐ NEW
+            note.classList.add('lifted');
         });
 
         note.addEventListener('dragend', () => {
             note.classList.remove('dragging');
-            note.classList.remove('lifted'); // ⭐ NEW
+            note.classList.remove('lifted');
+            note.classList.add('dropping');
+
+            setTimeout(() => {
+                note.classList.remove('dropping');
+                updateWIPSignals();
+            }, 160);
         });
     });
 
@@ -183,7 +212,7 @@
         note.addEventListener('touchstart', e => {
             activeNote = note;
             note.classList.add('dragging');
-            note.classList.add('lifted'); // ⭐ NEW
+            note.classList.add('lifted');
 
             const touch = e.touches[0];
             const rect = note.getBoundingClientRect();
@@ -210,11 +239,17 @@
             if (!activeNote) return;
 
             activeNote.classList.remove('dragging');
-            activeNote.classList.remove('lifted'); // ⭐ NEW
+            activeNote.classList.remove('lifted');
+            activeNote.classList.add('dropping');
 
             if (activeNote.currentColumn) {
                 activeNote.currentColumn.appendChild(activeNote);
             }
+
+            setTimeout(() => {
+                activeNote.classList.remove('dropping');
+                updateWIPSignals();
+            }, 160);
 
             activeNote.style.position = "relative";
             activeNote.style.left = "auto";
@@ -230,6 +265,22 @@
             return x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
         });
     }
+
+    // -----------------------------
+    // ⭐ LEAN MECHANIC #1 — WIP SIGNAL
+    // -----------------------------
+    function updateWIPSignals() {
+        columns.forEach(column => {
+            const count = column.querySelectorAll('.note').length;
+            if (count > 3) {
+                column.classList.add('wip-warning');
+            } else {
+                column.classList.remove('wip-warning');
+            }
+        });
+    }
+
+    updateWIPSignals();
 </script>
 
 </body>
